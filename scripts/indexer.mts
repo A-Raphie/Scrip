@@ -6,7 +6,13 @@
 import { decodeEventLog, type Abi } from "viem";
 import { writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } from "node:fs";
 
-const RPC = process.env.SCRIP_RPC_URL ?? "https://mainnet.base.org";
+const RPCS = process.env.SCRIP_RPC_URL
+  ? [process.env.SCRIP_RPC_URL]
+  : [
+      "https://mainnet.base.org",
+      "https://base-rpc.publicnode.com",
+      "https://1rpc.io/base",
+    ]; // shared-egress runners burn one gateway's cap; rotate across the rest
 const MAX_RANGE = 9_500n; // the public gateway's hard eth_getLogs range limit
 const MAX_WINDOWS_PER_RUN = 12; // stay under the gateway's request cap per tick
 const START_BLOCKS_BACK = process.env.SCRIP_START_BACK
@@ -81,10 +87,12 @@ function symbolFor(addr: string): string {
 }
 
 let rpcId = 1;
+let rpcIdx = 0;
 async function rpc(method: string, params: unknown[]): Promise<any> {
   for (let attempt = 0; attempt < 8; attempt++) {
+    const url = RPCS[rpcIdx++ % RPCS.length];
     try {
-      const res = await fetch(RPC, {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: rpcId++, method, params }),
@@ -96,8 +104,8 @@ async function rpc(method: string, params: unknown[]): Promise<any> {
       }
       return json.result;
     } catch (e: any) {
-      // the gateway flaps under load ("no backend is currently healthy");
-      // back off and retry
+      // the gateway flaps under load ("no backend is currently healthy") and
+      // rate-caps shared egress IPs; rotate providers and back off
       if (attempt === 7) throw e;
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
     }
