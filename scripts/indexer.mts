@@ -9,10 +9,9 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } fr
 const RPCS = process.env.SCRIP_RPC_URL
   ? [process.env.SCRIP_RPC_URL]
   : [
-      "https://mainnet.base.org",
-      "https://base-rpc.publicnode.com",
-      "https://1rpc.io/base",
-    ]; // shared-egress runners burn one gateway's cap; rotate across the rest
+      "https://base.drpc.org", // free plan: up to 10k-block getLogs ranges, serves history
+      "https://mainnet.base.org", // official; 9.5k ranges but rate-caps shared egress IPs
+    ]; // publicnode is archive-gated and 1rpc caps ranges at 50 blocks - both useless here
 const MAX_RANGE = 9_500n; // the public gateway's hard eth_getLogs range limit
 const MAX_WINDOWS_PER_RUN = 12; // stay under the gateway's request cap per tick
 const START_BLOCKS_BACK = process.env.SCRIP_START_BACK
