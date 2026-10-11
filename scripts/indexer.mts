@@ -123,6 +123,9 @@ async function getLogsSafe(fromB: bigint, toB: bigint, topics: string[]): Promis
       },
     ]);
   } catch (e) {
+    // bisection is for RANGE rejections only; rate limits must bubble up
+    // immediately or every split multiplies the requests that just got capped
+    if (/limit|rate/i.test((e as Error).message)) throw e;
     const span = toB - fromB;
     if (span <= 300n) throw e;
     const mid = fromB + span / 2n;
