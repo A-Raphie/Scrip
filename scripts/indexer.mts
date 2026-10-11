@@ -8,6 +8,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } fr
 
 const RPC = process.env.SCRIP_RPC_URL ?? "https://mainnet.base.org";
 const MAX_RANGE = 9_500n; // the public gateway's hard eth_getLogs range limit
+const MAX_WINDOWS_PER_RUN = 12; // stay under the gateway's request cap per tick
 const START_BLOCKS_BACK = process.env.SCRIP_START_BACK
   ? BigInt(process.env.SCRIP_START_BACK)
   : 8_000_000n; // about six months; Coinbase stock tokens launched mid-2026
@@ -203,17 +204,27 @@ async function main() {
 
   let last = cursor;
   let wrote = 0;
-  while (last < head) {
-    const to = last + MAX_RANGE > head ? head : last + MAX_RANGE;
-    for (const [kind, topic] of Object.entries(TOPICS) as ["mult" | "ann", string][]) {
-      const logs = await getLogsSafe(last + 1n, to, [topic]);
-      const lines = await decodeAll(kind, logs);
-      if (lines.length > 0) {
-        appendFileSync(outPath, lines.join("\n") + "\n");
-        wrote += lines.length;
+  let windows = 0;
+  try {
+    while (last < head && windows < MAX_WINDOWS_PER_RUN) {
+      const to = last + MAX_RANGE > head ? head : last + MAX_RANGE;
+      for (const [kind, topic] of Object.entries(TOPICS) as ["mult" | "ann", string][]) {
+        const logs = await getLogsSafe(last + 1n, to, [topic]);
+        const lines = await decodeAll(kind, logs);
+        if (lines.length > 0) {
+          appendFileSync(outPath, lines.join("\n") + "\n");
+          wrote += lines.length;
+        }
       }
+      last = to;
+      windows++;
+      // stay polite to the shared gateway between windows
+      await new Promise((r) => setTimeout(r, 400));
     }
-    last = to;
+  } catch (e) {
+    // gateway rate limits are expected and self-heal: persist the cursor and
+    // let the next scheduled tick resume instead of failing the run
+    console.error("stopping early at", last.toString(), "-", (e as Error).message);
   }
 
   writeFileSync(
