@@ -40,6 +40,7 @@ export interface CovarianceResult {
   sampleCovariance: number[][];
   shrunkCovariance: number[][];
   correlationMatrix: number[][];
+  meanReturns: number[];
   shrinkageIntensity: number;
 }
 
@@ -238,7 +239,7 @@ export function computeCovarianceMatrix(seriesList: AssetReturnSeries[]): {
  * Reduces estimation error for high-dimensional baskets like B20.
  */
 export function computeShrinkageCovariance(seriesList: AssetReturnSeries[]): CovarianceResult {
-  const { tickers, covarianceMatrix, correlationMatrix } = computeCovarianceMatrix(seriesList);
+  const { tickers, covarianceMatrix, correlationMatrix, meanReturns } = computeCovarianceMatrix(seriesList);
   const n = tickers.length;
   const t = Math.min(...seriesList.map((s) => s.returns.length));
 
@@ -248,6 +249,7 @@ export function computeShrinkageCovariance(seriesList: AssetReturnSeries[]): Cov
       sampleCovariance: covarianceMatrix,
       shrunkCovariance: covarianceMatrix,
       correlationMatrix,
+      meanReturns,
       shrinkageIntensity: 0,
     };
   }
@@ -298,6 +300,7 @@ export function computeShrinkageCovariance(seriesList: AssetReturnSeries[]): Cov
     sampleCovariance: covarianceMatrix,
     shrunkCovariance,
     correlationMatrix,
+    meanReturns,
     shrinkageIntensity: delta,
   };
 }
